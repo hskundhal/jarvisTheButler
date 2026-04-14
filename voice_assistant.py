@@ -11,7 +11,9 @@ warnings.filterwarnings("ignore", category=UserWarning)
 def listen():
     """Records audio and transcribes it using Whisper."""
     print("\n[Listening...] (Press Ctrl+C to stop)")
-    model = whisper.load_model("base") # 'base' is fast on 16GB Mac
+    # 'tiny.en' is significantly faster than 'base' and accurate for English
+    # Using CPU here because PyTorch MPS backend for the AMD GPU is crashing on this machine
+    model = whisper.load_model("tiny.en", device="cpu") 
     
     # Simple recording using 'sox' or 'ffmpeg' or just using a dedicated library
     # For simplicity in this POC, we'll assume the user has a .wav file or 
@@ -50,8 +52,8 @@ def main():
                 speak("Goodbye!")
                 break
 
-            # Send to Ollama
-            response = ollama.chat(model='llama3.2:3b', messages=[
+            # Send to Ollama (using the lighter 1b model instead of 3b)
+            response = ollama.chat(model='llama3.2:1b', messages=[
                 {'role': 'user', 'content': user_input},
             ])
             
