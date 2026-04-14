@@ -16,7 +16,7 @@ let localStream = null;
 
 // Graph Visualization Nodes
 let nodes = [];
-const NUM_NODES = 50;
+const NUM_NODES = 120; // Vastly increased node count for complexity
 
 const recordBtn = document.getElementById('recordButton');
 const statusText = document.getElementById('statusText');
@@ -33,22 +33,53 @@ class Node {
     constructor(canvasWidth, canvasHeight) {
         this.x = Math.random() * canvasWidth;
         this.y = Math.random() * canvasHeight;
-        this.vx = (Math.random() - 0.5) * 1;
-        this.vy = (Math.random() - 0.5) * 1;
-        this.baseRadius = Math.random() * 2 + 1;
+        
+        // Depth simulation (Z-axis conceptually)
+        this.z = Math.random() * 2 + 0.1; // 0.1 to 2.1
+        
+        // Velocity (slower things are in the back)
+        this.vx = (Math.random() - 0.5) * (1 / this.z);
+        this.vy = (Math.random() - 0.5) * (1 / this.z);
+        
+        this.baseRadius = (Math.random() * 2 + 1) / this.z;
         this.radius = this.baseRadius;
     }
     
-    update(canvasWidth, canvasHeight, frequency) {
+    update(canvasWidth, canvasHeight, frequency, isProcessing) {
+        // Attractor logic: when thinking, pull nodes to center
+        if (isProcessing) {
+            let cx = canvasWidth / 2;
+            let cy = canvasHeight / 2;
+            let dx = cx - this.x;
+            let dy = cy - this.y;
+            this.vx += dx * 0.0005;
+            this.vy += dy * 0.0005;
+            
+            // Add some jitter for "thinking"
+            this.vx += (Math.random() - 0.5) * 0.5;
+            this.vy += (Math.random() - 0.5) * 0.5;
+            
+            // Cap speed slightly higher during processing
+            this.vx *= 0.95;
+            this.vy *= 0.95;
+        } else {
+            // Calm drift mapping
+            this.vx *= 0.99; // subtle friction
+            this.vy *= 0.99;
+            // Add ambient drift back
+            this.vx += (Math.random() - 0.5) * 0.05 * (1/this.z);
+            this.vy += (Math.random() - 0.5) * 0.05 * (1/this.z);
+        }
+
         this.x += this.vx;
         this.y += this.vy;
         
-        // Bounce off walls
+        // Bounce off walls gently
         if (this.x < 0 || this.x > canvasWidth) this.vx *= -1;
         if (this.y < 0 || this.y > canvasHeight) this.vy *= -1;
         
-        // Pulse based on audio frequency
-        this.radius = this.baseRadius + (frequency / 10);
+        // Pulse based on audio frequency and depth
+        this.radius = this.baseRadius + (frequency / (15 * this.z));
     }
 }
 
@@ -184,12 +215,18 @@ function drawVisualizer() {
     // Update and draw nodes
     for(let i=0; i<nodes.length; i++) {
         // Tie node frequency to different parts of the spectrum
-        let freq = dataArray[i % bufferLength];
-        nodes[i].update(canvas.width, canvas.height, freq);
+        let freq = dataArray[i % bufferLength] || 0;
+        nodes[i].update(canvas.width, canvas.height, freq, isProcessing);
         
         ctx.beginPath();
         ctx.arc(nodes[i].x, nodes[i].y, nodes[i].radius, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(69, 243, 255, ${0.5 + (freq/512)})`;
+        
+        // Color shift based on depth and processing state
+        if (isProcessing) {
+            ctx.fillStyle = `rgba(255, 255, 255, ${Math.min(1, 0.2 + (1/nodes[i].z))})`;
+        } else {
+            ctx.fillStyle = `rgba(69, 243, 255, ${Math.min(1, 0.1 + (freq/255) + (0.5/nodes[i].z))})`;
+        }
         ctx.fill();
         
         // Draw connecting lines if close
@@ -198,14 +235,22 @@ function drawVisualizer() {
             let dy = nodes[i].y - nodes[j].y;
             let dist = Math.sqrt(dx*dx + dy*dy);
             
-            if (dist < 150) { // Increased connection distance since graph is larger
+            // Connect closer pairs when listening, extend radius gracefully when processing as they cluster
+            let connectDist = isProcessing ? 120 : 150; 
+            
+            if (dist < connectDist) { 
                 ctx.beginPath();
                 ctx.moveTo(nodes[i].x, nodes[i].y);
                 ctx.lineTo(nodes[j].x, nodes[j].y);
-                let alpha = 1 - (dist / 150);
-                // Make lines light up based on overall volume
-                ctx.strokeStyle = `rgba(255, 0, 127, ${alpha * (0.2 + (avgVolume/100))})`;
-                ctx.lineWidth = 1 + (avgVolume/50);
+                let alpha = 1 - (dist / connectDist);
+                
+                if (isProcessing) {
+                    ctx.strokeStyle = `rgba(200, 200, 255, ${alpha * 0.15})`;
+                    ctx.lineWidth = 0.5 + (1/nodes[i].z)*0.5;
+                } else {
+                    ctx.strokeStyle = `rgba(255, 0, 127, ${alpha * (0.05 + (avgVolume/255)) * (1/nodes[i].z)})`;
+                    ctx.lineWidth = 0.5 + (avgVolume/80);
+                }
                 ctx.stroke();
             }
         }
@@ -235,12 +280,6 @@ async function processAudio() {
     } catch (error) {
         console.error('Error processing audio:', error);
     } finally {
-        // Wait an arbitrary time assuming the Mac is speaking before continuing to listen
-        // Realistically we'd need a continuous callback from backend when speech ends, 
-        // but for now a static delay or just resuming immediately allows it to go.
-        // Let's resume listening after 2 seconds to give it time to talk, 
-        // OR better yet, change the backend to wait for 'say' to finish before returning the json payload!
-        
         isProcessing = false;
         visualizerSection.classList.remove('processing');
         startListening(); // Resume listening!
