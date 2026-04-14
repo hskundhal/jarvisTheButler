@@ -8,7 +8,7 @@ let streamSource;
 let animationId;
 
 // VAD (Voice Activity Detection) variables
-const VOLUME_THRESHOLD = 35; // Increased to ensure background noise isn't detected as speech
+const VOLUME_THRESHOLD = 35; // Increased significantly to handle Mac fan noise
 const SILENCE_DURATION_MS = 2000; // 2 seconds of silence triggers sending
 let silenceTimer = null;
 let isSpeaking = false;
@@ -18,6 +18,10 @@ let currentMode = 'chat'; // 'chat' or 'notes'
 // Graph Visualization Nodes
 let nodes = [];
 const NUM_NODES = 120; // Vastly increased node count for complexity
+
+let isSlicing = false;
+let compiledNotes = [];
+let pendingRequests = 0;
 
 const recordBtn = document.getElementById('recordButton');
 const modeToggleBtn = document.getElementById('modeToggleBtn');
@@ -98,8 +102,8 @@ recordBtn.addEventListener('click', async () => {
     } else {
         // Toggle force stop/start
         if (isRecording) {
-            stopListening();
-            recordBtn.innerHTML = "Play"; // Swap icon theoretically
+            stopListening(false);
+            // Notes will publish automatically when pendingRequests hit 0
         } else {
             startListening();
         }
@@ -113,10 +117,6 @@ async function initContinuousListening() {
         drawVisualizer();
         startListening();
         
-        // Hide orb since we use node graph
-        const orb = document.querySelector('.orb');
-        if(orb) orb.style.display = 'none';
-        
     } catch (err) {
         console.error("Error accessing microphone:", err);
         alert("Microphone access is required to use the voice assistant.");
@@ -124,7 +124,7 @@ async function initContinuousListening() {
 }
 
 function startListening() {
-    if(isProcessing) return; // Don't listen while generating reply
+    if(mediaRecorder && mediaRecorder.state === "recording") return; // Keep going
     
     mediaRecorder = new MediaRecorder(localStream);
     audioChunks = [];
@@ -134,14 +134,24 @@ function startListening() {
     });
     
     mediaRecorder.addEventListener('stop', () => {
-        if (audioChunks.length > 0 && !isProcessing) {
-            processAudio();
+        if (audioChunks.length > 0) {
+            // Keep a copy and clear so next recording cycle starts fresh
+            let capturedBlob = new Blob(audioChunks);
+            audioChunks = [];
+            if (!isSlicing && !isProcessing && currentMode === 'chat') {
+                // Manually stopped chat mode
+                processAudioInBackground(capturedBlob);
+            } else if (isSlicing || currentMode === 'notes') {
+                // Background slicing triggered by VAD
+                processAudioInBackground(capturedBlob);
+            }
         }
     });
     
     mediaRecorder.start();
     isRecording = true;
     isSpeaking = false;
+    isSlicing = false;
     
     statusText.innerText = currentMode === 'notes' ? 'Meeting Notes Active...' : 'Listening continuously...';
     visualizerSection.classList.add('recording');
@@ -170,11 +180,11 @@ function stopListening(forProcessing=false) {
     isSpeaking = false;
     clearTimeout(silenceTimer);
     
-    if (forProcessing) {
+    if (forProcessing && currentMode === 'chat') {
         statusText.innerText = 'Thinking...';
         visualizerSection.classList.remove('recording');
         visualizerSection.classList.add('processing');
-    } else {
+    } else if (!forProcessing) {
         statusText.innerText = 'Paused';
         visualizerSection.classList.remove('recording');
         recordBtn.classList.remove('active');
@@ -219,7 +229,16 @@ function drawVisualizer() {
             if (!silenceTimer) {
                 silenceTimer = setTimeout(() => {
                     // Silence lasted long enough!
-                    stopListening(true); // stop and trigger process
+                    if (currentMode === 'notes') {
+                        // Slicing trick: we stop then instantly restart to ship the audio track
+                        if (mediaRecorder.state === "recording") {
+                            isSlicing = true;
+                            mediaRecorder.stop();
+                            mediaRecorder.start();
+                        }
+                    } else {
+                        stopListening(true); // stop and trigger process (chat mode)
+                    }
                 }, SILENCE_DURATION_MS);
             }
         }
@@ -273,10 +292,14 @@ function drawVisualizer() {
     }
 }
 
-async function processAudio() {
-    isProcessing = true;
+async function processAudioInBackground(audioBlob) {
+    if (currentMode === 'chat') {
+        isProcessing = true; // Block UI for normal chatting
+        visualizerSection.classList.add('processing');
+    }
     
-    const audioBlob = new Blob(audioChunks);
+    pendingRequests++;
+    
     const formData = new FormData();
     formData.append('audio', audioBlob, 'record.webm');
     formData.append('mode', currentMode);
@@ -292,11 +315,12 @@ async function processAudio() {
         if (data.user_text && data.assistant_reply && data.assistant_reply.indexOf('[No notes]') === -1) {
             addMessage('user-msg', data.user_text);
             
-            // Note specific styling if required, default fits theme
-            addMessage('ai-msg', data.is_notes ? `📝 Note: ${data.assistant_reply}` : data.assistant_reply);
-            
-            // Speak the response IF NOT IN NOTES MODE
-            if (!data.is_notes) {
+            if (data.is_notes) {
+                addMessage('ai-msg', `📝 Sent to ledger: ${data.assistant_reply}`);
+                compiledNotes.push(data.assistant_reply);
+            } else {
+                addMessage('ai-msg', data.assistant_reply);
+                // Speak the response IF NOT IN NOTES MODE
                 await fetch('/speak', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -304,21 +328,42 @@ async function processAudio() {
                 });
             }
         }
-        
     } catch (error) {
         console.error('Error processing audio:', error);
     } finally {
-        isProcessing = false;
-        visualizerSection.classList.remove('processing');
-        startListening(); // Resume listening!
+        pendingRequests--;
+        
+        if (currentMode === 'chat') {
+            isProcessing = false;
+            visualizerSection.classList.remove('processing');
+            startListening(); // Resume listening!
+        } else {
+            // Notes mode: if recording stopped and all background fetches are done, publish notes
+            if (!isRecording && pendingRequests === 0 && compiledNotes.length > 0) {
+                publishFinalNotes();
+            }
+        }
     }
 }
 
-function addMessage(className, text) {
+function publishFinalNotes() {
+    if (compiledNotes.length === 0) return;
+    let md = "📌 <strong>FINAL MEETING NOTES:</strong><br><br>";
+    compiledNotes.forEach(note => {
+        md += `• ${note}<br>`;
+    });
+    addMessage('ai-msg', md, true);
+    compiledNotes = []; // clear ledger
+}
+
+function addMessage(className, text, isHTML = false) {
     const msgDiv = document.createElement('div');
     msgDiv.className = `message ${className}`;
-    msgDiv.textContent = text;
+    if (isHTML) {
+        msgDiv.innerHTML = text;
+    } else {
+        msgDiv.textContent = text;
+    }
     chatHistory.appendChild(msgDiv);
-    
     chatHistory.scrollTop = chatHistory.scrollHeight;
 }
