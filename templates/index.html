@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AURA Voice Assistant</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <!-- Visualizer Area -->
+        <div class="visualizer-section">
+            <div class="orb-container">
+                <canvas id="visualizerCanvas"></canvas>
+                <div class="orb"></div>
+            </div>
+            <h2 id="statusText">Ready</h2>
+            <button id="recordButton" class="record-btn">
+                <svg viewBox="0 0 24 24" fill="currentColor" class="mic-icon">
+                    <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5-3c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+                </svg>
+            </button>
+        </div>
+
+        <!-- Chat History -->
+        <div class="chat-section" id="chatHistory">
+            <!-- Messages inject here -->
+        </div>
+    </div>
+    
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>
