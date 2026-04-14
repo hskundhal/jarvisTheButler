@@ -2,8 +2,8 @@
     --bg-color: #0b0c10;
     --glass-bg: rgba(26, 27, 41, 0.6);
     --glass-border: rgba(255, 255, 255, 0.08);
-    --primary: #45f3ff;
-    --secondary: #ff007f;
+    --primary: #00ff41;
+    --secondary: #008f11;
     --text: #e0e2eb;
     --text-muted: #8b8d9c;
 }
@@ -21,8 +21,8 @@ body {
     min-height: 100vh;
     display: flex;
     justify-content: center;
-    background-image: radial-gradient(circle at 50% 0%, rgba(255,0,127,0.1), transparent 50%),
-                      radial-gradient(circle at 50% 100%, rgba(69,243,255,0.1), transparent 50%);
+    background-image: radial-gradient(circle at 50% 0%, rgba(0, 143, 17, 0.1), transparent 50%),
+                      radial-gradient(circle at 50% 100%, rgba(0, 255, 65, 0.1), transparent 50%);
     overflow: hidden;
 }
 
@@ -86,8 +86,8 @@ canvas {
 
 .processing .orb {
     animation: spin 1s infinite linear, pulse 1.5s infinite ease-in-out;
-    background: radial-gradient(circle, #00ffcc, var(--primary));
-    box-shadow: 0 0 40px #00ffcc, 0 0 80px var(--primary);
+    background: radial-gradient(circle, #ccffcc, var(--primary));
+    box-shadow: 0 0 40px #ccffcc, 0 0 80px var(--primary);
     opacity: 1;
 }
 
@@ -134,7 +134,7 @@ canvas {
 }
 
 .recording .record-btn {
-    background: rgba(255, 0, 127, 0.3);
+    background: rgba(0, 255, 65, 0.3);
     border-color: var(--secondary);
     color: var(--secondary);
 }
@@ -189,8 +189,8 @@ canvas {
 
 .ai-msg {
     align-self: flex-start;
-    background: rgba(69, 243, 255, 0.08);
-    border: 1px solid rgba(69, 243, 255, 0.15);
+    background: rgba(0, 255, 65, 0.08);
+    border: 1px solid rgba(0, 255, 65, 0.15);
     border-bottom-left-radius: 4px;
     color: var(--text);
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);

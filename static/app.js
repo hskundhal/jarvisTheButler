@@ -225,7 +225,7 @@ function drawVisualizer() {
         if (isProcessing) {
             ctx.fillStyle = `rgba(255, 255, 255, ${Math.min(1, 0.2 + (1/nodes[i].z))})`;
         } else {
-            ctx.fillStyle = `rgba(69, 243, 255, ${Math.min(1, 0.1 + (freq/255) + (0.5/nodes[i].z))})`;
+            ctx.fillStyle = `rgba(0, 255, 65, ${Math.min(1, 0.1 + (freq/255) + (0.5/nodes[i].z))})`;
         }
         ctx.fill();
         
@@ -245,10 +245,10 @@ function drawVisualizer() {
                 let alpha = 1 - (dist / connectDist);
                 
                 if (isProcessing) {
-                    ctx.strokeStyle = `rgba(200, 200, 255, ${alpha * 0.15})`;
+                    ctx.strokeStyle = `rgba(200, 255, 200, ${alpha * 0.15})`;
                     ctx.lineWidth = 0.5 + (1/nodes[i].z)*0.5;
                 } else {
-                    ctx.strokeStyle = `rgba(255, 0, 127, ${alpha * (0.05 + (avgVolume/255)) * (1/nodes[i].z)})`;
+                    ctx.strokeStyle = `rgba(0, 255, 65, ${alpha * (0.05 + (avgVolume/255)) * (1/nodes[i].z)})`;
                     ctx.lineWidth = 0.5 + (avgVolume/80);
                 }
                 ctx.stroke();
@@ -275,6 +275,13 @@ async function processAudio() {
         if (data.user_text && data.assistant_reply) {
             addMessage('user-msg', data.user_text);
             addMessage('ai-msg', data.assistant_reply);
+            
+            // Speak the response and wait for it to finish before listening again
+            await fetch('/speak', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({text: data.assistant_reply})
+            });
         }
         
     } catch (error) {

@@ -45,10 +45,6 @@ def process_audio():
         
         assistant_reply = response['message']['content']
         
-        # Make the Mac speak the text synchronously using a deep male voice (Daniel)
-        # This prevents the microphone from accidentally picking up the assistant's own voice
-        subprocess.run(["say", "-v", "Daniel", assistant_reply])
-        
         # We can clean up the file
         if os.path.exists(file_path):
             os.remove(file_path)
@@ -61,6 +57,18 @@ def process_audio():
     except Exception as e:
         print(f"Error processing audio: {e}")
         return jsonify({"error": str(e)}), 500
+
+@app.route("/speak", methods=["POST"])
+def speak():
+    data = request.get_json()
+    if not data or "text" not in data:
+        return jsonify({"error": "No text provided"}), 400
+        
+    text = data["text"]
+    # Make the Mac speak the text synchronously using a deep male voice (Daniel)
+    # This prevents the microphone from accidentally picking up the assistant's own voice
+    subprocess.run(["say", "-v", "Daniel", text])
+    return jsonify({"success": True})
 
 if __name__ == "__main__":
     app.run(host="127.0.0.1", port=5000, debug=True)
