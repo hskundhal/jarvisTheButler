@@ -13,12 +13,14 @@ const SILENCE_DURATION_MS = 2000; // 2 seconds of silence triggers sending
 let silenceTimer = null;
 let isSpeaking = false;
 let localStream = null;
+let currentMode = 'chat'; // 'chat' or 'notes'
 
 // Graph Visualization Nodes
 let nodes = [];
 const NUM_NODES = 120; // Vastly increased node count for complexity
 
 const recordBtn = document.getElementById('recordButton');
+const modeToggleBtn = document.getElementById('modeToggleBtn');
 const statusText = document.getElementById('statusText');
 const visualizerSection = document.querySelector('.visualizer-section');
 const canvas = document.getElementById('visualizerCanvas');
@@ -141,10 +143,24 @@ function startListening() {
     isRecording = true;
     isSpeaking = false;
     
-    statusText.innerText = 'Listening continuously...';
+    statusText.innerText = currentMode === 'notes' ? 'Meeting Notes Active...' : 'Listening continuously...';
     visualizerSection.classList.add('recording');
     recordBtn.classList.add('active');
 }
+
+modeToggleBtn.addEventListener('click', () => {
+    if (currentMode === 'chat') {
+        currentMode = 'notes';
+        modeToggleBtn.innerHTML = 'Switch to Chat Mode';
+        modeToggleBtn.classList.add('notes-active');
+        if (isRecording) statusText.innerText = 'Meeting Notes Active...';
+    } else {
+        currentMode = 'chat';
+        modeToggleBtn.innerHTML = 'Switch to Notes Mode';
+        modeToggleBtn.classList.remove('notes-active');
+        if (isRecording) statusText.innerText = 'Listening continuously...';
+    }
+});
 
 function stopListening(forProcessing=false) {
     if(mediaRecorder && mediaRecorder.state !== "inactive") {
@@ -263,6 +279,7 @@ async function processAudio() {
     const audioBlob = new Blob(audioChunks);
     const formData = new FormData();
     formData.append('audio', audioBlob, 'record.webm');
+    formData.append('mode', currentMode);
     
     try {
         const response = await fetch('/process_audio', {
@@ -272,16 +289,20 @@ async function processAudio() {
         
         const data = await response.json();
         
-        if (data.user_text && data.assistant_reply) {
+        if (data.user_text && data.assistant_reply && data.assistant_reply.indexOf('[No notes]') === -1) {
             addMessage('user-msg', data.user_text);
-            addMessage('ai-msg', data.assistant_reply);
             
-            // Speak the response and wait for it to finish before listening again
-            await fetch('/speak', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({text: data.assistant_reply})
-            });
+            // Note specific styling if required, default fits theme
+            addMessage('ai-msg', data.is_notes ? `📝 Note: ${data.assistant_reply}` : data.assistant_reply);
+            
+            // Speak the response IF NOT IN NOTES MODE
+            if (!data.is_notes) {
+                await fetch('/speak', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({text: data.assistant_reply})
+                });
+            }
         }
         
     } catch (error) {

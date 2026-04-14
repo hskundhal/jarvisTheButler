@@ -144,6 +144,29 @@ canvas {
     height: 24px;
 }
 
+.mode-btn {
+    height: 60px;
+    padding: 0 1.5rem;
+    border-radius: 30px;
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    color: var(--text);
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+    backdrop-filter: blur(10px);
+}
+
+.mode-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.mode-btn.notes-active {
+    background: rgba(0, 255, 65, 0.2);
+    border-color: var(--primary);
+    color: var(--primary);
+}
+
 .chat-section {
     flex: 1;
     overflow-y: auto;

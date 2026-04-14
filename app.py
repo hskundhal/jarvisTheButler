@@ -30,6 +30,8 @@ def process_audio():
     audio_file.save(file_path)
     
     try:
+        mode = request.form.get("mode", "chat")
+        
         # Transcribe audio
         result = model.transcribe(file_path)
         user_text = result["text"].strip()
@@ -37,12 +39,16 @@ def process_audio():
         if not user_text:
             return jsonify({"user_text": "", "assistant_reply": ""})
             
-        # Send to Ollama
-        #response = ollama.chat(model='llama3.2:1b', messages=[
-        response = ollama.chat(model='qwen2.5:0.5b', messages=[
-            {'role': 'user', 'content': user_text},
-        ])
-        
+        if mode == "notes":
+            # Just extract concise notes without chattiness
+            prompt = f"Convert the following conversation snippet into one or two highly concise bullet points (exclude all conversational filler, return ONLY the bullet points). If there's no actionable information, return '[No notes]'. Snippet: {user_text}"
+            response = ollama.chat(model='qwen2.5:0.5b', messages=[{'role': 'user', 'content': prompt}])
+        else:
+            # Send to Ollama (Using Qwen 0.5b for maximum speed)
+            response = ollama.chat(model='qwen2.5:0.5b', messages=[
+                {'role': 'user', 'content': user_text},
+            ])
+            
         assistant_reply = response['message']['content']
         
         # We can clean up the file
@@ -51,7 +57,8 @@ def process_audio():
             
         return jsonify({
             "user_text": user_text,
-            "assistant_reply": assistant_reply
+            "assistant_reply": assistant_reply,
+            "is_notes": (mode == "notes")
         })
         
     except Exception as e:
