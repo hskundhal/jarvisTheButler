@@ -25,9 +25,9 @@ const canvas = document.getElementById('visualizerCanvas');
 const ctx = canvas.getContext('2d');
 const chatHistory = document.getElementById('chatHistory');
 
-// Set canvas size bigger for node graph
-canvas.width = 600;
-canvas.height = 400;
+// Set canvas size bigger for side-by-side layout node graph
+canvas.width = 800; // Increased to match the CSS visually
+canvas.height = 600;
 
 class Node {
     constructor(canvasWidth, canvasHeight) {
@@ -198,11 +198,11 @@ function drawVisualizer() {
             let dy = nodes[i].y - nodes[j].y;
             let dist = Math.sqrt(dx*dx + dy*dy);
             
-            if (dist < 100) {
+            if (dist < 150) { // Increased connection distance since graph is larger
                 ctx.beginPath();
                 ctx.moveTo(nodes[i].x, nodes[i].y);
                 ctx.lineTo(nodes[j].x, nodes[j].y);
-                let alpha = 1 - (dist / 100);
+                let alpha = 1 - (dist / 150);
                 // Make lines light up based on overall volume
                 ctx.strokeStyle = `rgba(255, 0, 127, ${alpha * (0.2 + (avgVolume/100))})`;
                 ctx.lineWidth = 1 + (avgVolume/50);
