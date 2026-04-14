@@ -8,8 +8,8 @@ let streamSource;
 let animationId;
 
 // VAD (Voice Activity Detection) variables
-const VOLUME_THRESHOLD = 5; // Adjust based on mic sensitivity
-const SILENCE_DURATION_MS = 1500; // 1.5s of silence triggers sending
+const VOLUME_THRESHOLD = 35; // Increased to ensure background noise isn't detected as speech
+const SILENCE_DURATION_MS = 2000; // 2 seconds of silence triggers sending
 let silenceTimer = null;
 let isSpeaking = false;
 let localStream = null;

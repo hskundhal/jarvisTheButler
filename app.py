@@ -38,15 +38,16 @@ def process_audio():
             return jsonify({"user_text": "", "assistant_reply": ""})
             
         # Send to Ollama
-        response = ollama.chat(model='llama3.2:1b', messages=[
+        #response = ollama.chat(model='llama3.2:1b', messages=[
+        response = ollama.chat(model='qwen2.5:0.5b', messages=[
             {'role': 'user', 'content': user_text},
         ])
         
         assistant_reply = response['message']['content']
         
-        # Make the Mac speak the text synchronously so the web request waits
+        # Make the Mac speak the text synchronously using a deep male voice (Daniel)
         # This prevents the microphone from accidentally picking up the assistant's own voice
-        subprocess.run(["say", assistant_reply])
+        subprocess.run(["say", "-v", "Daniel", assistant_reply])
         
         # We can clean up the file
         if os.path.exists(file_path):
